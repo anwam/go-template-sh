@@ -1,0 +1,30 @@
+# Binaries
+go-template-sh
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+*.out
+
+# Go workspace
+*.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vendor
+vendor/
