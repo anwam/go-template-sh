@@ -40,11 +40,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	confirmed := false
-	prompt := &survey.Confirm{
+	confirmPrompt := &survey.Confirm{
 		Message: "Ready to generate your project. Continue?",
 		Default: true,
 	}
-	if err := survey.AskOne(prompt, &confirmed); err != nil {
+	if err := survey.AskOne(confirmPrompt, &confirmed); err != nil {
 		return err
 	}
 

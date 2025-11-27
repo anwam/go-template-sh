@@ -1,0 +1,67 @@
+package main
+
+import (
+"context"
+"fmt"
+"os"
+"os/signal"
+"syscall"
+"time"
+
+"{{.ModulePath}}/internal/config"
+"{{.ModulePath}}/internal/observability"
+"{{.ModulePath}}/internal/server"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+{{.LoggerInit}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	obs, err := observability.New(ctx, cfg)
+	if err != nil {
+		logger.Error("Failed to initialize observability", "error", err)
+		os.Exit(1)
+	}
+	defer obs.Shutdown(ctx)
+
+	srv, err := server.New(cfg, obs)
+	if err != nil {
+		logger.Error("Failed to create server", "error", err)
+		os.Exit(1)
+	}
+
+	go func() {
+		logger.Info("Starting server", "port", {{.PortRef}})
+		if err := srv.Start(); err != nil {
+			logger.Error("Server error", "error", err)
+			cancel()
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-quit:
+		logger.Info("Shutting down server...")
+	case <-ctx.Done():
+		logger.Info("Context cancelled, shutting down...")
+	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Server shutdown error", "error", err)
+	}
+
+	logger.Info("Server stopped gracefully")
+}

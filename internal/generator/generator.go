@@ -2,27 +2,53 @@ package generator
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/anwam/go-template-sh/internal/config"
+	"github.com/anwam/go-template-sh/internal/fsys"
 )
 
+// Generator handles the generation of Go project templates.
 type Generator struct {
 	config     *config.Config
 	outputDir  string
 	projectDir string
+	fs         fsys.FileSystem
 }
 
-func New(cfg *config.Config, outputDir string) *Generator {
-	return &Generator{
-		config:     cfg,
-		outputDir:  outputDir,
-		projectDir: filepath.Join(outputDir, cfg.ProjectName),
+// Option configures the generator.
+type Option func(*Generator)
+
+// WithFileSystem sets a custom file system implementation.
+// Useful for testing without actual file I/O.
+func WithFileSystem(fs fsys.FileSystem) Option {
+	return func(g *Generator) {
+		g.fs = fs
 	}
 }
 
+// New creates a new Generator with the given configuration and output directory.
+func New(cfg *config.Config, outputDir string, opts ...Option) *Generator {
+	g := &Generator{
+		config:     cfg,
+		outputDir:  outputDir,
+		projectDir: filepath.Join(outputDir, cfg.ProjectName),
+		fs:         fsys.New(), // Default to OS file system
+	}
+
+	for _, opt := range opts {
+		opt(g)
+	}
+
+	return g
+}
+
 func (g *Generator) Generate() error {
+	// Validate configuration before generating
+	if err := g.config.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	if err := g.createDirectoryStructure(); err != nil {
 		return fmt.Errorf("failed to create directory structure: %w", err)
 	}
@@ -143,7 +169,7 @@ func (g *Generator) createDirectoryStructure() error {
 	)
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := g.fs.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -153,8 +179,5 @@ func (g *Generator) createDirectoryStructure() error {
 
 func (g *Generator) writeFile(relativePath, content string) error {
 	fullPath := filepath.Join(g.projectDir, relativePath)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(fullPath, []byte(content), 0644)
+	return g.fs.WriteFile(fullPath, []byte(content), 0644)
 }

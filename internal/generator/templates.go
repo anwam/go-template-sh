@@ -76,6 +76,9 @@ func (g *Generator) buildDependencies() []string {
 		deps = append(deps, "\tgithub.com/joho/godotenv v1.5.1")
 	}
 
+	// UUID for request IDs
+	deps = append(deps, "\tgithub.com/google/uuid v1.6.0")
+
 	// Testing dependencies
 	deps = append(deps,
 		"\tgithub.com/stretchr/testify v1.8.4",
@@ -85,83 +88,25 @@ func (g *Generator) buildDependencies() []string {
 	return deps
 }
 
-func (g *Generator) generateMainFile() error {
-	// Prepare code snippets for template substitution
-	// loggerInit: initialization code for the logger, injected into main()
-	// portRef: reference to the port field in config, used in logger.Info
-	loggerInit := g.getLoggerInitCode()
-	portRef := g.getConfigFieldReference("Port")
-
-	content := fmt.Sprintf(`package main
-
-import (
-	"context"
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"%s/internal/config"
-	"%s/internal/observability"
-	"%s/internal/server"
-)
-
-func main() {
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %%v\n", err)
-		os.Exit(1)
-	}
-
-%s
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	obs, err := observability.New(ctx, cfg)
-	if err != nil {
-		logger.Error("Failed to initialize observability", "error", err)
-		os.Exit(1)
-	}
-	defer obs.Shutdown(ctx)
-
-	srv, err := server.New(cfg, obs)
-	if err != nil {
-		logger.Error("Failed to create server", "error", err)
-		os.Exit(1)
-	}
-
-	go func() {
-		logger.Info("Starting server", "port", %s)
-		if err := srv.Start(); err != nil {
-			logger.Error("Server error", "error", err)
-			cancel()
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	select {
-	case <-quit:
-		logger.Info("Shutting down server...")
-	case <-ctx.Done():
-		logger.Info("Context cancelled, shutting down...")
-	}
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer shutdownCancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Server shutdown error", "error", err)
-	}
-
-	logger.Info("Server stopped gracefully")
+// MainTemplateData holds data for the main.go template.
+type MainTemplateData struct {
+	ModulePath string
+	LoggerInit string
+	PortRef    string
 }
-`, g.config.ModulePath, g.config.ModulePath, g.config.ModulePath, loggerInit, portRef)
 
-	return g.writeFile(fmt.Sprintf("cmd/%s/main.go", g.config.ProjectName), content)
+func (g *Generator) generateMainFile() error {
+	data := MainTemplateData{
+		ModulePath: g.config.ModulePath,
+		LoggerInit: g.getLoggerInitCode(),
+		PortRef:    g.getConfigFieldReference("Port"),
+	}
+
+	return g.writeEmbeddedTemplate(
+		fmt.Sprintf("cmd/%s/main.go", g.config.ProjectName),
+		"main.go.tmpl",
+		data,
+	)
 }
 
 func (g *Generator) getLoggerInitCode() string {

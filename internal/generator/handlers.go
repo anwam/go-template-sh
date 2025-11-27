@@ -24,6 +24,9 @@ func (g *Generator) getHandlersContent() string {
 		imports = append(imports, `"github.com/labstack/echo/v4"`)
 	} else if g.config.Framework == "fiber" {
 		imports = append(imports, `"github.com/gofiber/fiber/v2"`)
+		if g.config.EnableMetrics {
+			imports = append(imports, `"github.com/gofiber/fiber/v2/middleware/adaptor"`)
+		}
 	}
 
 	if g.config.EnableMetrics {
@@ -184,7 +187,8 @@ func (g *Generator) getFiberHandlers() string {
 	if g.config.EnableMetrics {
 		metricsHandler = `
 func (h *Handler) MetricsFiber(c *fiber.Ctx) error {
-	return c.SendString("Metrics endpoint")
+	// Use adaptor to serve promhttp handler in Fiber
+	return adaptor.HTTPHandler(promhttp.Handler())(c)
 }`
 	}
 
