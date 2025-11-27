@@ -68,7 +68,7 @@ const RequestIDKey contextKey = "requestID"
 
 func (g *Generator) getStandardMiddleware(loggerType string) string {
 	loggerImpl := ""
-	
+
 	switch g.config.Logger {
 	case "slog":
 		loggerImpl = `	logger.Info("HTTP request",

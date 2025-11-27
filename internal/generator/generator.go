@@ -109,6 +109,10 @@ func (g *Generator) Generate() error {
 		return err
 	}
 
+	if err := g.generateTestFiles(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -131,6 +135,12 @@ func (g *Generator) createDirectoryStructure() error {
 	if g.config.NeedsCache() {
 		dirs = append(dirs, filepath.Join(g.projectDir, "internal", "cache"))
 	}
+
+	// Add directories for testing
+	dirs = append(dirs,
+		filepath.Join(g.projectDir, "internal", "mocks"),
+		filepath.Join(g.projectDir, "docs"),
+	)
 
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {

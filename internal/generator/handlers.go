@@ -31,6 +31,7 @@ func (g *Generator) getHandlersContent() string {
 	}
 
 	frameworkHandlers := g.getFrameworkSpecificHandlers()
+	envRef := g.getConfigFieldReference("Environment")
 
 	return fmt.Sprintf(`package handlers
 
@@ -51,9 +52,9 @@ func NewHandler(cfg *config.Config, obs *observability.Observability) *Handler {
 }
 
 type Response struct {
-	Status  string                 ` + "`json:\"status\"`" + `
-	Message string                 ` + "`json:\"message,omitempty\"`" + `
-	Data    map[string]interface{} ` + "`json:\"data,omitempty\"`" + `
+	Status  string                 `+"`json:\"status\"`"+`
+	Message string                 `+"`json:\"message,omitempty\"`"+`
+	Data    map[string]interface{} `+"`json:\"data,omitempty\"`"+`
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -79,13 +80,13 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		Message: "Welcome to %s",
 		Data: map[string]interface{}{
 			"version":     "1.0.0",
-			"environment": h.config.Environment,
+			"environment": %s,
 		},
 	})
 }
 
 %s
-`, strings.Join(imports, "\n\t"), g.config.ProjectName, frameworkHandlers)
+`, strings.Join(imports, "\n\t"), g.config.ProjectName, envRef, frameworkHandlers)
 }
 
 func (g *Generator) getFrameworkSpecificHandlers() string {
@@ -110,6 +111,8 @@ func (h *Handler) MetricsGin(c *gin.Context) {
 }`
 	}
 
+	envRef := g.getConfigFieldReference("Environment")
+
 	return fmt.Sprintf(`func (h *Handler) HealthGin(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{
 		Status:  "ok",
@@ -130,11 +133,11 @@ func (h *Handler) IndexGin(c *gin.Context) {
 		Message: "Welcome to %s",
 		Data: map[string]interface{}{
 			"version":     "1.0.0",
-			"environment": h.config.Environment,
+			"environment": %s,
 		},
 	})
 }
-%s`, g.config.ProjectName, metricsHandler)
+%s`, g.config.ProjectName, envRef, metricsHandler)
 }
 
 func (g *Generator) getEchoHandlers() string {
@@ -146,6 +149,8 @@ func (h *Handler) MetricsEcho(c echo.Context) error {
 	return nil
 }`
 	}
+
+	envRef := g.getConfigFieldReference("Environment")
 
 	return fmt.Sprintf(`func (h *Handler) HealthEcho(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{
@@ -167,11 +172,11 @@ func (h *Handler) IndexEcho(c echo.Context) error {
 		Message: "Welcome to %s",
 		Data: map[string]interface{}{
 			"version":     "1.0.0",
-			"environment": h.config.Environment,
+			"environment": %s,
 		},
 	})
 }
-%s`, g.config.ProjectName, metricsHandler)
+%s`, g.config.ProjectName, envRef, metricsHandler)
 }
 
 func (g *Generator) getFiberHandlers() string {
@@ -182,6 +187,8 @@ func (h *Handler) MetricsFiber(c *fiber.Ctx) error {
 	return c.SendString("Metrics endpoint")
 }`
 	}
+
+	envRef := g.getConfigFieldReference("Environment")
 
 	return fmt.Sprintf(`func (h *Handler) HealthFiber(c *fiber.Ctx) error {
 	return c.JSON(Response{
@@ -203,9 +210,9 @@ func (h *Handler) IndexFiber(c *fiber.Ctx) error {
 		Message: "Welcome to %s",
 		Data: map[string]interface{}{
 			"version":     "1.0.0",
-			"environment": h.config.Environment,
+			"environment": %s,
 		},
 	})
 }
-%s`, g.config.ProjectName, metricsHandler)
+%s`, g.config.ProjectName, envRef, metricsHandler)
 }

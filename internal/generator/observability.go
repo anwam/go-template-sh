@@ -18,7 +18,7 @@ func (g *Generator) getObservabilityContent() string {
 	}
 
 	loggerField := "Logger interface{}"
-	
+
 	switch g.config.Logger {
 	case "slog":
 		imports = append(imports, `"log/slog"`, `"os"`)
@@ -44,7 +44,7 @@ func (g *Generator) getObservabilityContent() string {
 		)
 		tracerField = `	TracerProvider trace.TracerProvider
 	tracerShutdown func(context.Context) error`
-		
+
 		tracerInit = `
 	tp, shutdown, err := initTracer(ctx, cfg)
 	if err != nil {
@@ -53,7 +53,7 @@ func (g *Generator) getObservabilityContent() string {
 	obs.TracerProvider = tp
 	obs.tracerShutdown = shutdown
 	otel.SetTracerProvider(tp)`
-	
+
 		tracerShutdown = `
 	if o.tracerShutdown != nil {
 		_ = o.tracerShutdown(ctx)
@@ -71,7 +71,7 @@ func (g *Generator) getObservabilityContent() string {
 		)
 		metricsField = `	httpRequestsTotal    *prometheus.CounterVec
 	httpRequestDuration  *prometheus.HistogramVec`
-		
+
 		metricsInit = `
 	obs.httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -89,7 +89,7 @@ func (g *Generator) getObservabilityContent() string {
 		},
 		[]string{"method", "endpoint"},
 	)`
-		
+
 		metricsHandler = `
 func (o *Observability) MetricsHandler() http.Handler {
 	return promhttp.Handler()
@@ -151,10 +151,13 @@ func (g *Generator) getLoggerInitialization() string {
 }
 
 func (g *Generator) getTracerImplementation() string {
-	return `
+	otlpRef := g.getConfigFieldReference("OTLPEndpoint")
+	serviceNameRef := g.getConfigFieldReference("ServiceName")
+
+	return fmt.Sprintf(`
 func initTracer(ctx context.Context, cfg *config.Config) (trace.TracerProvider, func(context.Context) error, error) {
 	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+		otlptracegrpc.WithEndpoint(%s),
 		otlptracegrpc.WithInsecure(),
 	)
 	if err != nil {
@@ -163,7 +166,7 @@ func initTracer(ctx context.Context, cfg *config.Config) (trace.TracerProvider, 
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceName(cfg.ServiceName),
+			semconv.ServiceName(%s),
 		),
 	)
 	if err != nil {
@@ -176,7 +179,7 @@ func initTracer(ctx context.Context, cfg *config.Config) (trace.TracerProvider, 
 	)
 
 	return tp, tp.Shutdown, nil
-}`
+}`, otlpRef, serviceNameRef)
 }
 
 func (g *Generator) generateLoggerFile() error {
@@ -185,6 +188,8 @@ func (g *Generator) generateLoggerFile() error {
 }
 
 func (g *Generator) getLoggerFileContent() string {
+	envRef := g.getConfigFieldReference("Environment")
+
 	switch g.config.Logger {
 	case "slog":
 		return fmt.Sprintf(`package observability
@@ -200,7 +205,7 @@ var defaultLogger *slog.Logger
 
 func NewLogger(cfg *config.Config) *slog.Logger {
 	var level slog.Level
-	if cfg.Environment == "production" {
+	if %s == "production" {
 		level = slog.LevelInfo
 	} else {
 		level = slog.LevelDebug
@@ -217,8 +222,8 @@ func SetDefaultLogger(logger *slog.Logger) {
 	defaultLogger = logger
 	slog.SetDefault(logger)
 }
-`, g.config.ModulePath)
-	
+`, g.config.ModulePath, envRef)
+
 	case "zap":
 		return fmt.Sprintf(`package observability
 
@@ -232,7 +237,7 @@ import (
 func NewZapLogger(cfg *config.Config) (*zap.Logger, error) {
 	var zapConfig zap.Config
 	
-	if cfg.Environment == "production" {
+	if %s == "production" {
 		zapConfig = zap.NewProductionConfig()
 	} else {
 		zapConfig = zap.NewDevelopmentConfig()
@@ -241,8 +246,8 @@ func NewZapLogger(cfg *config.Config) (*zap.Logger, error) {
 
 	return zapConfig.Build()
 }
-`, g.config.ModulePath)
-	
+`, g.config.ModulePath, envRef)
+
 	case "zerolog":
 		return fmt.Sprintf(`package observability
 
@@ -258,7 +263,7 @@ func NewZerologLogger(cfg *config.Config) *zerolog.Logger {
 	zerolog.TimeFieldFormat = time.RFC3339
 
 	var level zerolog.Level
-	if cfg.Environment == "production" {
+	if %s == "production" {
 		level = zerolog.InfoLevel
 	} else {
 		level = zerolog.DebugLevel
@@ -272,8 +277,8 @@ func NewZerologLogger(cfg *config.Config) *zerolog.Logger {
 
 	return &logger
 }
-`, g.config.ModulePath)
-	
+`, g.config.ModulePath, envRef)
+
 	default:
 		return ""
 	}

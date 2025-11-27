@@ -10,23 +10,24 @@ func (g *Generator) generateDatabasePackages() error {
 			return err
 		}
 	}
-	
+
 	if g.config.HasDatabase("mysql") {
 		if err := g.generateMySQLDB(); err != nil {
 			return err
 		}
 	}
-	
+
 	if g.config.HasDatabase("mongodb") {
 		if err := g.generateMongoDB(); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
 func (g *Generator) generatePostgresDB() error {
+	urlRef := g.getConfigFieldReference("PostgresURL")
 	content := fmt.Sprintf(`package database
 
 import (
@@ -42,7 +43,7 @@ type PostgresDB struct {
 }
 
 func NewPostgresDB(ctx context.Context, cfg *config.Config) (*PostgresDB, error) {
-	pool, err := pgxpool.New(ctx, cfg.PostgresURL)
+	pool, err := pgxpool.New(ctx, %s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %%w", err)
 	}
@@ -63,12 +64,13 @@ func (db *PostgresDB) Close() {
 func (db *PostgresDB) Pool() *pgxpool.Pool {
 	return db.pool
 }
-`, g.config.ModulePath)
+`, g.config.ModulePath, urlRef)
 
 	return g.writeFile("internal/database/postgres.go", content)
 }
 
 func (g *Generator) generateMySQLDB() error {
+	urlRef := g.getConfigFieldReference("MySQLURL")
 	content := fmt.Sprintf(`package database
 
 import (
@@ -86,7 +88,7 @@ type MySQLDB struct {
 }
 
 func NewMySQLDB(ctx context.Context, cfg *config.Config) (*MySQLDB, error) {
-	db, err := sql.Open("mysql", cfg.MySQLURL)
+	db, err := sql.Open("mysql", %s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %%w", err)
 	}
@@ -112,12 +114,13 @@ func (db *MySQLDB) Close() error {
 func (db *MySQLDB) DB() *sql.DB {
 	return db.db
 }
-`, g.config.ModulePath)
+`, g.config.ModulePath, urlRef)
 
 	return g.writeFile("internal/database/mysql.go", content)
 }
 
 func (g *Generator) generateMongoDB() error {
+	urlRef := g.getConfigFieldReference("MongoURL")
 	content := fmt.Sprintf(`package database
 
 import (
@@ -135,7 +138,7 @@ type MongoDB struct {
 }
 
 func NewMongoDB(ctx context.Context, cfg *config.Config) (*MongoDB, error) {
-	clientOptions := options.Client().ApplyURI(cfg.MongoURL)
+	clientOptions := options.Client().ApplyURI(%s)
 	
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -166,12 +169,13 @@ func (db *MongoDB) Client() *mongo.Client {
 func (db *MongoDB) Database(name string) *mongo.Database {
 	return db.client.Database(name)
 }
-`, g.config.ModulePath)
+`, g.config.ModulePath, urlRef)
 
 	return g.writeFile("internal/database/mongodb.go", content)
 }
 
 func (g *Generator) generateCachePackage() error {
+	urlRef := g.getConfigFieldReference("RedisURL")
 	content := fmt.Sprintf(`package cache
 
 import (
@@ -187,7 +191,7 @@ type RedisCache struct {
 }
 
 func NewRedisCache(ctx context.Context, cfg *config.Config) (*RedisCache, error) {
-	opts, err := redis.ParseURL(cfg.RedisURL)
+	opts, err := redis.ParseURL(%s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Redis URL: %%w", err)
 	}
@@ -211,7 +215,7 @@ func (c *RedisCache) Close() error {
 func (c *RedisCache) Client() *redis.Client {
 	return c.client
 }
-`, g.config.ModulePath)
+`, g.config.ModulePath, urlRef)
 
 	return g.writeFile("internal/cache/redis.go", content)
 }

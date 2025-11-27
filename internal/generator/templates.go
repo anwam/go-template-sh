@@ -76,11 +76,21 @@ func (g *Generator) buildDependencies() []string {
 		deps = append(deps, "\tgithub.com/joho/godotenv v1.5.1")
 	}
 
+	// Testing dependencies
+	deps = append(deps,
+		"\tgithub.com/stretchr/testify v1.8.4",
+		"\tgo.uber.org/mock v0.4.0",
+	)
+
 	return deps
 }
 
 func (g *Generator) generateMainFile() error {
+	// Prepare code snippets for template substitution
+	// loggerInit: initialization code for the logger, injected into main()
+	// portRef: reference to the port field in config, used in logger.Info
 	loggerInit := g.getLoggerInitCode()
+	portRef := g.getConfigFieldReference("Port")
 
 	content := fmt.Sprintf(`package main
 
@@ -123,7 +133,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("Starting server", "port", cfg.Port)
+		logger.Info("Starting server", "port", %s)
 		if err := srv.Start(); err != nil {
 			logger.Error("Server error", "error", err)
 			cancel()
@@ -149,7 +159,7 @@ func main() {
 
 	logger.Info("Server stopped gracefully")
 }
-`, g.config.ModulePath, g.config.ModulePath, g.config.ModulePath, loggerInit)
+`, g.config.ModulePath, g.config.ModulePath, g.config.ModulePath, loggerInit, portRef)
 
 	return g.writeFile(fmt.Sprintf("cmd/%s/main.go", g.config.ProjectName), content)
 }

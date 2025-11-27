@@ -362,8 +362,9 @@ func (c *Config) validate() error {
 	}
 	return nil
 }
-`, g.getYAMLDatabaseConfigField(), g.getYAMLCacheConfigField(), g.getYAMLObservabilityConfigField(),
-		g.getYAMLDatabaseConfigTypes(), g.getYAMLCacheConfigTypes(), g.getYAMLObservabilityConfigTypes())
+%s`, g.getYAMLDatabaseConfigField(), g.getYAMLCacheConfigField(), g.getYAMLObservabilityConfigField(),
+		g.getYAMLDatabaseConfigTypes(), g.getYAMLCacheConfigTypes(), g.getYAMLObservabilityConfigTypes(),
+		g.generateConfigAccessors())
 
 	return g.writeFile("internal/config/config.go", content)
 }
@@ -555,8 +556,9 @@ func (c *Config) validate() error {
 	}
 	return nil
 }
-`, g.getJSONDatabaseConfigField(), g.getJSONCacheConfigField(), g.getJSONObservabilityConfigField(),
-		g.getJSONDatabaseConfigTypes(), g.getJSONCacheConfigTypes(), g.getJSONObservabilityConfigTypes())
+%s`, g.getJSONDatabaseConfigField(), g.getJSONCacheConfigField(), g.getJSONObservabilityConfigField(),
+		g.getJSONDatabaseConfigTypes(), g.getJSONCacheConfigTypes(), g.getJSONObservabilityConfigTypes(),
+		g.generateConfigAccessors())
 
 	return g.writeFile("internal/config/config.go", content)
 }
@@ -754,8 +756,9 @@ func (c *Config) validate() error {
 	}
 	return nil
 }
-`, g.getTOMLDatabaseConfigField(), g.getTOMLCacheConfigField(), g.getTOMLObservabilityConfigField(),
-		g.getTOMLDatabaseConfigTypes(), g.getTOMLCacheConfigTypes(), g.getTOMLObservabilityConfigTypes())
+%s`, g.getTOMLDatabaseConfigField(), g.getTOMLCacheConfigField(), g.getTOMLObservabilityConfigField(),
+		g.getTOMLDatabaseConfigTypes(), g.getTOMLCacheConfigTypes(), g.getTOMLObservabilityConfigTypes(),
+		g.generateConfigAccessors())
 
 	return g.writeFile("internal/config/config.go", content)
 }

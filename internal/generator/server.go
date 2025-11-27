@@ -71,7 +71,7 @@ func New(cfg *config.Config, obs *observability.Observability) (*Server, error) 
 %s
 
 	s.httpServer = &http.Server{
-		Addr:         ":" + cfg.Port,
+		Addr:         ":" + %s,
 		Handler:      h,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -88,7 +88,7 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
-`, strings.Join(imports, "\n\t"), g.getMetricsRoute(), g.getTracingMiddleware())
+`, strings.Join(imports, "\n\t"), g.getMetricsRoute(), g.getTracingMiddleware(), g.getConfigFieldReference("Port"))
 }
 
 func (g *Generator) generateChiServer() string {
@@ -140,7 +140,7 @@ func New(cfg *config.Config, obs *observability.Observability) (*Server, error) 
 %s
 
 	s.httpServer = &http.Server{
-		Addr:         ":" + cfg.Port,
+		Addr:         ":" + %s,
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -157,7 +157,7 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
-`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getMetricsRoute())
+`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getMetricsRoute(), g.getConfigFieldReference("Port"))
 }
 
 func (g *Generator) generateGinServer() string {
@@ -173,6 +173,8 @@ func (g *Generator) generateGinServer() string {
 		fmt.Sprintf(`"%s/internal/observability"`, g.config.ModulePath),
 	}
 
+	envCheck := fmt.Sprintf("if %s == \"production\" {", g.getConfigFieldReference("Environment"))
+
 	return fmt.Sprintf(`package server
 
 import (
@@ -186,7 +188,7 @@ type Server struct {
 }
 
 func New(cfg *config.Config, obs *observability.Observability) (*Server, error) {
-	if cfg.Environment == "production" {
+	%s
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -209,7 +211,7 @@ func New(cfg *config.Config, obs *observability.Observability) (*Server, error) 
 %s
 
 	s.httpServer = &http.Server{
-		Addr:         ":" + cfg.Port,
+		Addr:         ":" + %s,
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -226,7 +228,7 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
-`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getGinMetricsRoute())
+`, strings.Join(imports, "\n\t"), envCheck, g.getTracingMiddleware(), g.getGinMetricsRoute(), g.getConfigFieldReference("Port"))
 }
 
 func (g *Generator) generateEchoServer() string {
@@ -284,13 +286,13 @@ func New(cfg *config.Config, obs *observability.Observability) (*Server, error) 
 }
 
 func (s *Server) Start() error {
-	return s.echo.Start(":" + s.config.Port)
+	return s.echo.Start(":" + %s)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.echo.Shutdown(ctx)
 }
-`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getEchoMetricsRoute())
+`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getEchoMetricsRoute(), g.getConfigFieldReference("Port"))
 }
 
 func (g *Generator) generateFiberServer() string {
@@ -345,13 +347,13 @@ func New(cfg *config.Config, obs *observability.Observability) (*Server, error) 
 }
 
 func (s *Server) Start() error {
-	return s.app.Listen(":" + s.config.Port)
+	return s.app.Listen(":" + %s)
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.app.ShutdownWithContext(ctx)
 }
-`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getFiberMetricsRoute())
+`, strings.Join(imports, "\n\t"), g.getTracingMiddleware(), g.getFiberMetricsRoute(), g.getConfigFieldReference("Port"))
 }
 
 func (g *Generator) getMetricsRoute() string {
