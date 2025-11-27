@@ -1,0 +1,62 @@
+package server
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/handlers"
+	custommw "{{.ModulePath}}/internal/middleware"
+	"{{.ModulePath}}/internal/observability"
+)
+
+type Server struct {
+	echo   *echo.Echo
+	config *config.Config
+	obs    *observability.Observability
+}
+
+func New(cfg *config.Config, obs *observability.Observability) (*Server, error) {
+	s := &Server{
+		config: cfg,
+		obs:    obs,
+		echo:   echo.New(),
+	}
+
+	s.echo.Use(middleware.RequestID())
+	s.echo.Use(middleware.Recover())
+	s.echo.Use(custommw.EchoLogger(obs.Logger))
+	s.echo.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+		Timeout: 60 * time.Second,
+	}))
+{{- if .EnableTracing}}
+	s.echo.Use(custommw.EchoTracing(obs.TracerProvider))
+{{- end}}
+
+	handler := handlers.NewHandler(cfg, obs)
+	
+	s.echo.GET("/health", handler.HealthEcho)
+	s.echo.GET("/ready", handler.ReadyEcho)
+	s.echo.GET("/", handler.IndexEcho)
+{{- if .EnableMetrics}}
+	s.echo.GET("/metrics", echo.WrapHandler(obs.MetricsHandler()))
+{{- end}}
+
+	s.echo.Server.ReadTimeout = 15 * time.Second
+	s.echo.Server.WriteTimeout = 15 * time.Second
+	s.echo.Server.IdleTimeout = 60 * time.Second
+
+	return s, nil
+}
+
+func (s *Server) Start() error {
+	return s.echo.Start(":" + {{.PortRef}})
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.echo.Shutdown(ctx)
+}

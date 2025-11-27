@@ -6,114 +6,12 @@ import (
 )
 
 func (g *Generator) generateMakefile() error {
-	dbServices := []string{}
-	if g.config.HasDatabase("postgres") {
-		dbServices = append(dbServices, "postgres")
+	data := MakefileTemplateData{
+		ProjectName:   g.config.ProjectName,
+		GoVersion:     g.config.GoVersion,
+		IncludeDocker: g.config.IncludeDocker,
 	}
-	if g.config.HasDatabase("mysql") {
-		dbServices = append(dbServices, "mysql")
-	}
-	if g.config.HasDatabase("mongodb") {
-		dbServices = append(dbServices, "mongodb")
-	}
-	if g.config.HasDatabase("redis") {
-		dbServices = append(dbServices, "redis")
-	}
-
-	dockerTargets := ""
-	if g.config.IncludeDocker && len(dbServices) > 0 {
-		dockerTargets = `
-.PHONY: docker-up docker-down docker-logs
-docker-up:
-	docker-compose up -d
-
-docker-down:
-	docker-compose down
-
-docker-logs:
-	docker-compose logs -f`
-	}
-
-	mockTargets := ""
-	if g.config.NeedsSQL() || g.config.NeedsNoSQL() {
-		mockTargets = `
-.PHONY: generate-mocks
-generate-mocks:
-	@echo "Generating mocks..."
-	@go generate ./...`
-	}
-
-	content := fmt.Sprintf(`.PHONY: help build run test test-coverage test-unit test-integration lint clean
-
-help:
-	@echo "Available targets:"
-	@echo "  build            - Build the application"
-	@echo "  run              - Run the application"
-	@echo "  test             - Run all tests with coverage"
-	@echo "  test-coverage    - Run tests and open coverage report"
-	@echo "  test-unit        - Run unit tests only"
-	@echo "  test-integration - Run integration tests only"
-	@echo "  generate-mocks   - Generate mock implementations"
-	@echo "  lint             - Run linter"
-	@echo "  clean            - Clean build artifacts"
-%s
-
-build:
-	@echo "Building..."
-	@go build -o bin/%s ./cmd/%s
-
-run:
-	@echo "Running..."
-	@go run ./cmd/%s
-
-test:
-	@echo "Running tests..."
-	@go test -v -race -coverprofile=coverage.out ./...
-
-test-coverage: test
-	@echo "Generating coverage report..."
-	@go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
-
-test-unit:
-	@echo "Running unit tests..."
-	@go test -v -short -race ./...
-
-test-integration:
-	@echo "Running integration tests..."
-	@go test -v -run Integration ./...
-
-lint:
-	@echo "Running linters..."
-	@golangci-lint run
-
-clean:
-	@echo "Cleaning..."
-	@rm -rf bin/
-	@rm -f coverage.out coverage.html
-
-deps:
-	@echo "Downloading dependencies..."
-	@go mod download
-	@go mod tidy
-
-install-tools:
-	@echo "Installing development tools..."
-	@go install go.uber.org/mock/mockgen@latest
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-%s%s
-`, func() string {
-		extra := ""
-		if dockerTargets != "" {
-			extra += "\n	@echo \"  docker-up        - Start Docker services\"\n	@echo \"  docker-down      - Stop Docker services\"\n	@echo \"  docker-logs      - View Docker logs\""
-		}
-		if mockTargets != "" {
-			extra += "\n	@echo \"  generate-mocks   - Generate mock implementations\""
-		}
-		return extra
-	}(), g.config.ProjectName, g.config.ProjectName, g.config.ProjectName, mockTargets, dockerTargets)
-
-	return g.writeFile("Makefile", content)
+	return g.writeEmbeddedTemplate("Makefile", "Makefile.tmpl", data)
 }
 
 func (g *Generator) generateEnvFile() error {

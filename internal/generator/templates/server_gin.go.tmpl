@@ -1,0 +1,67 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/handlers"
+	"{{.ModulePath}}/internal/middleware"
+	"{{.ModulePath}}/internal/observability"
+)
+
+type Server struct {
+	httpServer *http.Server
+	config     *config.Config
+	obs        *observability.Observability
+}
+
+func New(cfg *config.Config, obs *observability.Observability) (*Server, error) {
+	if {{.EnvRef}} == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	s := &Server{
+		config: cfg,
+		obs:    obs,
+	}
+
+	r := gin.New()
+	
+	r.Use(gin.Recovery())
+	r.Use(middleware.GinLogger(obs.Logger))
+{{- if .EnableTracing}}
+	r.Use(middleware.GinTracing(obs.TracerProvider))
+{{- end}}
+
+	handler := handlers.NewHandler(cfg, obs)
+	
+	r.GET("/health", handler.HealthGin)
+	r.GET("/ready", handler.ReadyGin)
+	r.GET("/", handler.IndexGin)
+{{- if .EnableMetrics}}
+	r.GET("/metrics", gin.WrapH(obs.MetricsHandler()))
+{{- end}}
+
+	s.httpServer = &http.Server{
+		Addr:         ":" + {{.PortRef}},
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	return s, nil
+}
+
+func (s *Server) Start() error {
+	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
+}

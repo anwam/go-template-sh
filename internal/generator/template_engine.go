@@ -37,6 +37,28 @@ type TemplateData struct {
 	LoggerImport   string
 }
 
+// ServerTemplateData holds data for server templates.
+type ServerTemplateData struct {
+	ModulePath    string
+	PortRef       string
+	EnvRef        string
+	EnableTracing bool
+	EnableMetrics bool
+}
+
+// DockerTemplateData holds data for Docker templates.
+type DockerTemplateData struct {
+	ProjectName string
+	GoVersion   string
+}
+
+// MakefileTemplateData holds data for Makefile templates.
+type MakefileTemplateData struct {
+	ProjectName   string
+	GoVersion     string
+	IncludeDocker bool
+}
+
 // NewTemplateData creates TemplateData from a config.
 func (g *Generator) NewTemplateData() *TemplateData {
 	return &TemplateData{

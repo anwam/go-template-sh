@@ -1,0 +1,67 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"{{.ModulePath}}/internal/config"
+	"{{.ModulePath}}/internal/handlers"
+	custommw "{{.ModulePath}}/internal/middleware"
+	"{{.ModulePath}}/internal/observability"
+)
+
+type Server struct {
+	httpServer *http.Server
+	config     *config.Config
+	obs        *observability.Observability
+}
+
+func New(cfg *config.Config, obs *observability.Observability) (*Server, error) {
+	s := &Server{
+		config: cfg,
+		obs:    obs,
+	}
+
+	r := chi.NewRouter()
+	
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(custommw.Logger(obs.Logger))
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
+{{- if .EnableTracing}}
+	r.Use(custommw.Tracing(obs.TracerProvider))
+{{- end}}
+
+	handler := handlers.NewHandler(cfg, obs)
+	
+	r.Get("/health", handler.Health)
+	r.Get("/ready", handler.Ready)
+	r.Get("/", handler.Index)
+{{- if .EnableMetrics}}
+	r.Handle("/metrics", obs.MetricsHandler())
+{{- end}}
+
+	s.httpServer = &http.Server{
+		Addr:         ":" + {{.PortRef}},
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	return s, nil
+}
+
+func (s *Server) Start() error {
+	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.httpServer.Shutdown(ctx)
+}
